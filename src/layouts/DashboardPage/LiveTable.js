@@ -14,26 +14,28 @@ function LiveTable() {
 
     useEffect(() => {
         const interval = setInterval(() => {
-            // Fetch updated matches every second
             fetchUpdatedMatches();
 
             const newTimers = { ...timersRef.current };
             const updatedMatches = matches.filter((match, index) => {
-                if (newTimers[index].currentTimer < 30  && newTimers[index].start) {
-                    newTimers[index].currentTimer += 1;
+                const timer = newTimers[index];
+                if (!timer) return false;
+                if (timer.currentTimer < 30 && timer.start) {
+                    timer.currentTimer += 1;
                     return true;
-                } else if (newTimers[index].currentTimer > 30) {
-                    newTimers[index].start = false; // Stop the timer when it reaches 0
-                    return false; // Remove match from live table
+                } else if (timer.currentTimer > 30) {
+                    timer.start = false;
+                    return false;
                 } else {
                     const now = new Date();
-                    const matchDate = newTimers[index].date;
+                    const matchDate = timer.date;
                     if (now >= matchDate) {
-                        newTimers[index].start = true;
+                        timer.start = true;
                     }
                     return true;
                 }
             });
+
             timersRef.current = newTimers;
             setTimers({ ...newTimers });
             setMatches(updatedMatches);
@@ -41,6 +43,7 @@ function LiveTable() {
 
         return () => clearInterval(interval);
     }, [matches]);
+
 
     const fetchMatches = () => {
         axios.post("http://localhost:8080/get-matches-by-type",null,{
@@ -50,9 +53,15 @@ function LiveTable() {
                 }
                )
             .then((response) => {
-                setMatches(response.data);
+                const matchData = Array.isArray(response.data) ? response.data : [];
+                setMatches(matchData);
                 const initialTimers = response.data.reduce((acc, match, index) => {
-                    const matchDate = parse(match.date, 'dd/MM/yy HH:mm:ss', new Date());
+                    let matchDate = new Date();
+                    try {
+                        matchDate = parse(match.date, 'dd/MM/yy HH:mm:ss', new Date());
+                    } catch (e) {
+                        console.warn("Invalid match date:", match.date);
+                    }
                     acc[index] = { currentTimer:0, start: false, date: matchDate };
                     return acc;
                 }, {});
@@ -93,7 +102,7 @@ function LiveTable() {
                                 {timers[index] && (
                                     <span className="badge badge-pill badge-warning p-2 mt-2" style={{ fontSize: '1.2rem' }}>
                                         <i className="fas fa-clock mr-2"></i>
-                                        {match.time< 0 ? ' Awaiting match start' : match.time<30 ? match.time : ' Game over'}
+                                        {match.time< 0 ? ' Awaiting match start' : match.time<30 ? ' '+match.time : ' Game over'}
                                     </span>
                                 )}
                             </div>
